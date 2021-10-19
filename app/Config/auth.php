@@ -11,14 +11,14 @@
 return [
 
     // Method of authentication to use
-    // Options: standard, ldap, saml2
+    // Options: standard, ldap, saml2, oidc
     'method' => env('AUTH_METHOD', 'standard'),
 
     // Authentication Defaults
     // This option controls the default authentication "guard" and password
     // reset options for your application.
     'defaults' => [
-        'guard' => env('AUTH_METHOD', 'standard'),
+        'guard'     => env('AUTH_METHOD', 'standard'),
         'passwords' => 'users',
     ],
 
@@ -26,18 +26,22 @@ return [
     // All authentication drivers have a user provider. This defines how the
     // users are actually retrieved out of your database or other storage
     // mechanisms used by this application to persist your user's data.
-    // Supported drivers: "session", "api-token", "ldap-session"
+    // Supported drivers: "session", "api-token", "ldap-session", "async-external-session"
     'guards' => [
         'standard' => [
-            'driver' => 'session',
+            'driver'   => 'session',
             'provider' => 'users',
         ],
         'ldap' => [
-            'driver' => 'ldap-session',
+            'driver'   => 'ldap-session',
             'provider' => 'external',
         ],
         'saml2' => [
-            'driver' => 'saml2-session',
+            'driver'   => 'async-external-session',
+            'provider' => 'external',
+        ],
+        'oidc' => [
+            'driver'   => 'async-external-session',
             'provider' => 'external',
         ],
         'api' => [
@@ -52,11 +56,11 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => \BookStack\Auth\User::class,
+            'model'  => \BookStack\Auth\User::class,
         ],
         'external' => [
             'driver' => 'external-users',
-            'model' => \BookStack\Auth\User::class,
+            'model'  => \BookStack\Auth\User::class,
         ],
     ],
 
@@ -67,9 +71,10 @@ return [
     'passwords' => [
         'users' => [
             'provider' => 'users',
-            'email' => 'emails.password',
-            'table' => 'password_resets',
-            'expire' => 60,
+            'email'    => 'emails.password',
+            'table'    => 'password_resets',
+            'expire'   => 60,
+            'throttle' => 60,
         ],
     ],
 

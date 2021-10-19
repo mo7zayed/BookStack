@@ -39,7 +39,12 @@ return [
     'reset' => 'Скинути',
     'remove' => 'Видалити',
     'add' => 'Додати',
+    'configure' => 'Configure',
     'fullscreen' => 'На весь екран',
+    'favourite' => 'Favourite',
+    'unfavourite' => 'Unfavourite',
+    'next' => 'Next',
+    'previous' => 'Previous',
 
     // Sort Options
     'sort_options' => 'Параметри сортування',
@@ -56,6 +61,7 @@ return [
     'no_activity' => 'Немає активності для показу',
     'no_items' => 'Немає доступних елементів',
     'back_to_top' => 'Повернутися до початку',
+    'skip_to_main_content' => 'Skip to main content',
     'toggle_details' => 'Подробиці',
     'toggle_thumbnails' => 'Мініатюри',
     'details' => 'Деталі',

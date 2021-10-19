@@ -27,6 +27,8 @@ return [
     'images' => 'Obrazki',
     'my_recent_drafts' => 'Moje ostatnie wersje robocze',
     'my_recently_viewed' => 'Moje ostatnio wyświetlane',
+    'my_most_viewed_favourites' => 'My Most Viewed Favourites',
+    'my_favourites' => 'My Favourites',
     'no_pages_viewed' => 'Nie przeglądałeś jeszcze żadnych stron',
     'no_pages_recently_created' => 'Nie utworzono ostatnio żadnych stron',
     'no_pages_recently_updated' => 'Nie zaktualizowano ostatnio żadnych stron',
@@ -34,6 +36,7 @@ return [
     'export_html' => 'Plik HTML',
     'export_pdf' => 'Plik PDF',
     'export_text' => 'Plik tekstowy',
+    'export_md' => 'Markdown File',
 
     // Permissions and restrictions
     'permissions' => 'Uprawnienia',
@@ -96,6 +99,7 @@ return [
     'shelves_permissions' => 'Uprawnienia półki',
     'shelves_permissions_updated' => 'Uprawnienia półki zostały zaktualizowane',
     'shelves_permissions_active' => 'Uprawnienia półki są aktywne',
+    'shelves_permissions_cascade_warning' => 'Permissions on bookshelves do not automatically cascade to contained books. This is because a book can exist on multiple shelves. Permissions can however be copied down to child books using the option found below.',
     'shelves_copy_permissions_to_books' => 'Skopiuj uprawnienia do książek',
     'shelves_copy_permissions' => 'Skopiuj uprawnienia',
     'shelves_copy_permissions_explain' => 'To spowoduje zastosowanie obecnych ustawień uprawnień dla tej półki do wszystkich książek w niej zawartych. Przed aktywacją upewnij się, że wszelkie zmiany w uprawnieniach do tej półki zostały zapisane.',
@@ -230,6 +234,7 @@ return [
     'pages_initial_name' => 'Nowa strona',
     'pages_editing_draft_notification' => 'Edytujesz obecnie wersje roboczą, która była ostatnio zapisana :timeDiff.',
     'pages_draft_edited_notification' => 'Od tego czasu ta strona była zmieniana. Zalecane jest odrzucenie tej wersji roboczej.',
+    'pages_draft_page_changed_since_creation' => 'This page has been updated since this draft was created. It is recommended that you discard this draft or take care not to overwrite any page changes.',
     'pages_draft_edit_active' => [
         'start_a' => ':count użytkowników rozpoczęło edytowanie tej strony',
         'start_b' => ':userName edytuje stronę',

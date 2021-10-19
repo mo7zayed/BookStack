@@ -27,6 +27,8 @@ return [
     'images' => 'Images',
     'my_recent_drafts' => 'My Recent Drafts',
     'my_recently_viewed' => 'My Recently Viewed',
+    'my_most_viewed_favourites' => 'My Most Viewed Favourites',
+    'my_favourites' => 'My Favourites',
     'no_pages_viewed' => 'You have not viewed any pages',
     'no_pages_recently_created' => 'No pages have been recently created',
     'no_pages_recently_updated' => 'No pages have been recently updated',
@@ -34,6 +36,7 @@ return [
     'export_html' => 'Contained Web File',
     'export_pdf' => 'PDF File',
     'export_text' => 'Plain Text File',
+    'export_md' => 'Markdown File',
 
     // Permissions and restrictions
     'permissions' => 'Permissions',
@@ -96,6 +99,7 @@ return [
     'shelves_permissions' => 'Bookshelf Permissions',
     'shelves_permissions_updated' => 'Bookshelf Permissions Updated',
     'shelves_permissions_active' => 'Bookshelf Permissions Active',
+    'shelves_permissions_cascade_warning' => 'Permissions on bookshelves do not automatically cascade to contained books. This is because a book can exist on multiple shelves. Permissions can however be copied down to child books using the option found below.',
     'shelves_copy_permissions_to_books' => 'Copy Permissions to Books',
     'shelves_copy_permissions' => 'Copy Permissions',
     'shelves_copy_permissions_explain' => 'This will apply the current permission settings of this bookshelf to all books contained within. Before activating, ensure any changes to the permissions of this bookshelf have been saved.',
@@ -230,6 +234,7 @@ return [
     'pages_initial_name' => 'New Page',
     'pages_editing_draft_notification' => 'You are currently editing a draft that was last saved :timeDiff.',
     'pages_draft_edited_notification' => 'This page has been updated by since that time. It is recommended that you discard this draft.',
+    'pages_draft_page_changed_since_creation' => 'This page has been updated since this draft was created. It is recommended that you discard this draft or take care not to overwrite any page changes.',
     'pages_draft_edit_active' => [
         'start_a' => ':count users have started editing this page',
         'start_b' => ':userName has started editing this page',

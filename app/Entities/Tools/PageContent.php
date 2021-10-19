@@ -1,12 +1,20 @@
-<?php namespace BookStack\Entities\Tools;
+<?php
+
+namespace BookStack\Entities\Tools;
 
 use BookStack\Entities\Models\Page;
+use BookStack\Entities\Tools\Markdown\CustomListItemRenderer;
 use BookStack\Entities\Tools\Markdown\CustomStrikeThroughExtension;
+use BookStack\Exceptions\ImageUploadException;
 use BookStack\Facades\Theme;
 use BookStack\Theming\ThemeEvents;
+use BookStack\Uploads\ImageRepo;
+use BookStack\Util\HtmlContentFilter;
 use DOMDocument;
 use DOMNodeList;
 use DOMXPath;
+use Illuminate\Support\Str;
+use League\CommonMark\Block\Element\ListItem;
 use League\CommonMark\CommonMarkConverter;
 use League\CommonMark\Environment;
 use League\CommonMark\Extension\Table\TableExtension;
@@ -14,7 +22,6 @@ use League\CommonMark\Extension\TaskList\TaskListExtension;
 
 class PageContent
 {
-
     protected $page;
 
     /**
@@ -30,6 +37,7 @@ class PageContent
      */
     public function setNewHTML(string $html)
     {
+        $html = $this->extractBase64ImagesFromHtml($html);
         $this->page->html = $this->formatHtml($html);
         $this->page->text = $this->toPlainText();
         $this->page->markdown = '';
@@ -40,6 +48,7 @@ class PageContent
      */
     public function setNewMarkdown(string $markdown)
     {
+        $markdown = $this->extractBase64ImagesFromMarkdown($markdown);
         $this->page->markdown = $markdown;
         $html = $this->markdownToHtml($markdown);
         $this->page->html = $this->formatHtml($html);
@@ -57,7 +66,92 @@ class PageContent
         $environment->addExtension(new CustomStrikeThroughExtension());
         $environment = Theme::dispatch(ThemeEvents::COMMONMARK_ENVIRONMENT_CONFIGURE, $environment) ?? $environment;
         $converter = new CommonMarkConverter([], $environment);
+
+        $environment->addBlockRenderer(ListItem::class, new CustomListItemRenderer(), 10);
+
         return $converter->convertToHtml($markdown);
+    }
+
+    /**
+     * Convert all base64 image data to saved images.
+     */
+    protected function extractBase64ImagesFromHtml(string $htmlText): string
+    {
+        if (empty($htmlText) || strpos($htmlText, 'data:image') === false) {
+            return $htmlText;
+        }
+
+        $doc = $this->loadDocumentFromHtml($htmlText);
+        $container = $doc->documentElement;
+        $body = $container->childNodes->item(0);
+        $childNodes = $body->childNodes;
+        $xPath = new DOMXPath($doc);
+        $imageRepo = app()->make(ImageRepo::class);
+
+        // Get all img elements with image data blobs
+        $imageNodes = $xPath->query('//img[contains(@src, \'data:image\')]');
+        foreach ($imageNodes as $imageNode) {
+            $imageSrc = $imageNode->getAttribute('src');
+            [$dataDefinition, $base64ImageData] = explode(',', $imageSrc, 2);
+            $extension = strtolower(preg_split('/[\/;]/', $dataDefinition)[1] ?? 'png');
+
+            // Validate extension
+            if (!$imageRepo->imageExtensionSupported($extension)) {
+                $imageNode->setAttribute('src', '');
+                continue;
+            }
+
+            // Save image from data with a random name
+            $imageName = 'embedded-image-' . Str::random(8) . '.' . $extension;
+
+            try {
+                $image = $imageRepo->saveNewFromData($imageName, base64_decode($base64ImageData), 'gallery', $this->page->id);
+                $imageNode->setAttribute('src', $image->url);
+            } catch (ImageUploadException $exception) {
+                $imageNode->setAttribute('src', '');
+            }
+        }
+
+        // Generate inner html as a string
+        $html = '';
+        foreach ($childNodes as $childNode) {
+            $html .= $doc->saveHTML($childNode);
+        }
+
+        return $html;
+    }
+
+    /**
+     * Convert all inline base64 content to uploaded image files.
+     */
+    protected function extractBase64ImagesFromMarkdown(string $markdown)
+    {
+        $imageRepo = app()->make(ImageRepo::class);
+        $matches = [];
+        preg_match_all('/!\[.*?]\(.*?(data:image\/.*?)[)"\s]/', $markdown, $matches);
+
+        foreach ($matches[1] as $base64Match) {
+            [$dataDefinition, $base64ImageData] = explode(',', $base64Match, 2);
+            $extension = strtolower(preg_split('/[\/;]/', $dataDefinition)[1] ?? 'png');
+
+            // Validate extension
+            if (!$imageRepo->imageExtensionSupported($extension)) {
+                $markdown = str_replace($base64Match, '', $markdown);
+                continue;
+            }
+
+            // Save image from data with a random name
+            $imageName = 'embedded-image-' . Str::random(8) . '.' . $extension;
+
+            try {
+                $image = $imageRepo->saveNewFromData($imageName, base64_decode($base64ImageData), 'gallery', $this->page->id);
+                $markdown = str_replace($base64Match, $image->url, $markdown);
+            } catch (ImageUploadException $exception) {
+                $markdown = str_replace($base64Match, '', $markdown);
+            }
+        }
+
+        return $markdown;
     }
 
     /**
@@ -65,14 +159,11 @@ class PageContent
      */
     protected function formatHtml(string $htmlText): string
     {
-        if ($htmlText == '') {
+        if (empty($htmlText)) {
             return $htmlText;
         }
 
-        libxml_use_internal_errors(true);
-        $doc = new DOMDocument();
-        $doc->loadHTML(mb_convert_encoding($htmlText, 'HTML-ENTITIES', 'UTF-8'));
-
+        $doc = $this->loadDocumentFromHtml($htmlText);
         $container = $doc->documentElement;
         $body = $container->childNodes->item(0);
         $childNodes = $body->childNodes;
@@ -111,7 +202,7 @@ class PageContent
     protected function updateLinks(DOMXPath $xpath, string $old, string $new)
     {
         $old = str_replace('"', '', $old);
-        $matchingLinks = $xpath->query('//body//*//*[@href="'.$old.'"]');
+        $matchingLinks = $xpath->query('//body//*//*[@href="' . $old . '"]');
         foreach ($matchingLinks as $domElem) {
             $domElem->setAttribute('href', $new);
         }
@@ -120,7 +211,7 @@ class PageContent
     /**
      * Set a unique id on the given DOMElement.
      * A map for existing ID's should be passed in to check for current existence.
-     * Returns a pair of strings in the format [old_id, new_id]
+     * Returns a pair of strings in the format [old_id, new_id].
      */
     protected function setUniqueId(\DOMNode $element, array &$idMap): array
     {
@@ -132,6 +223,7 @@ class PageContent
         $existingId = $element->getAttribute('id');
         if (strpos($existingId, 'bkmrk') === 0 && !isset($idMap[$existingId])) {
             $idMap[$existingId] = true;
+
             return [$existingId, $existingId];
         }
 
@@ -149,6 +241,7 @@ class PageContent
 
         $element->setAttribute('id', $newId);
         $idMap[$newId] = true;
+
         return [$existingId, $newId];
     }
 
@@ -158,18 +251,19 @@ class PageContent
     protected function toPlainText(): string
     {
         $html = $this->render(true);
+
         return html_entity_decode(strip_tags($html));
     }
 
     /**
-     * Render the page for viewing
+     * Render the page for viewing.
      */
-    public function render(bool $blankIncludes = false) : string
+    public function render(bool $blankIncludes = false): string
     {
-        $content = $this->page->html;
+        $content = $this->page->html ?? '';
 
         if (!config('app.allow_content_scripts')) {
-            $content = $this->escapeScripts($content);
+            $content = HtmlContentFilter::removeScripts($content);
         }
 
         if ($blankIncludes) {
@@ -182,7 +276,7 @@ class PageContent
     }
 
     /**
-     * Parse the headers on the page to get a navigation menu
+     * Parse the headers on the page to get a navigation menu.
      */
     public function getNavigation(string $htmlContent): array
     {
@@ -190,11 +284,9 @@ class PageContent
             return [];
         }
 
-        libxml_use_internal_errors(true);
-        $doc = new DOMDocument();
-        $doc->loadHTML(mb_convert_encoding($htmlContent, 'HTML-ENTITIES', 'UTF-8'));
+        $doc = $this->loadDocumentFromHtml($htmlContent);
         $xPath = new DOMXPath($doc);
-        $headers = $xPath->query("//h1|//h2|//h3|//h4|//h5|//h6");
+        $headers = $xPath->query('//h1|//h2|//h3|//h4|//h5|//h6');
 
         return $headers ? $this->headerNodesToLevelList($headers) : [];
     }
@@ -211,9 +303,9 @@ class PageContent
 
             return [
                 'nodeName' => strtolower($header->nodeName),
-                'level' => intval(str_replace('h', '', $header->nodeName)),
-                'link' => '#' . $header->getAttribute('id'),
-                'text' => $text,
+                'level'    => intval(str_replace('h', '', $header->nodeName)),
+                'link'     => '#' . $header->getAttribute('id'),
+                'text'     => $text,
             ];
         })->filter(function ($header) {
             return mb_strlen($header['text']) > 0;
@@ -223,6 +315,7 @@ class PageContent
         $levelChange = ($tree->pluck('level')->min() - 1);
         $tree = $tree->map(function ($header) use ($levelChange) {
             $header['level'] -= ($levelChange);
+
             return $header;
         });
 
@@ -232,7 +325,7 @@ class PageContent
     /**
      * Remove any page include tags within the given HTML.
      */
-    protected function blankPageIncludes(string $html) : string
+    protected function blankPageIncludes(string $html): string
     {
         return preg_replace("/{{@\s?([0-9].*?)}}/", '', $html);
     }
@@ -240,7 +333,7 @@ class PageContent
     /**
      * Parse any include tags "{{@<page_id>#section}}" to be part of the page.
      */
-    protected function parsePageIncludes(string $html) : string
+    protected function parsePageIncludes(string $html): string
     {
         $matches = [];
         preg_match_all("/{{@\s?([0-9].*?)}}/", $html, $matches);
@@ -256,6 +349,7 @@ class PageContent
             }
 
             // Find page and skip this if page not found
+            /** @var ?Page $matchedPage */
             $matchedPage = Page::visible()->find($pageId);
             if ($matchedPage === null) {
                 $html = str_replace($fullMatch, '', $html);
@@ -276,16 +370,13 @@ class PageContent
         return $html;
     }
 
-
     /**
      * Fetch the content from a specific section of the given page.
      */
     protected function fetchSectionOfPage(Page $page, string $sectionId): string
     {
         $topLevelTags = ['table', 'ul', 'ol'];
-        $doc = new DOMDocument();
-        libxml_use_internal_errors(true);
-        $doc->loadHTML(mb_convert_encoding('<body>'.$page->html.'</body>', 'HTML-ENTITIES', 'UTF-8'));
+        $doc = $this->loadDocumentFromHtml($page->html);
 
         // Search included content for the id given and blank out if not exists.
         $matchingElem = $doc->getElementById($sectionId);
@@ -310,63 +401,15 @@ class PageContent
     }
 
     /**
-     * Escape script tags within HTML content.
+     * Create and load a DOMDocument from the given html content.
      */
-    protected function escapeScripts(string $html) : string
+    protected function loadDocumentFromHtml(string $html): DOMDocument
     {
-        if (empty($html)) {
-            return $html;
-        }
-
         libxml_use_internal_errors(true);
         $doc = new DOMDocument();
+        $html = '<body>' . $html . '</body>';
         $doc->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
-        $xPath = new DOMXPath($doc);
 
-        // Remove standard script tags
-        $scriptElems = $xPath->query('//script');
-        foreach ($scriptElems as $scriptElem) {
-            $scriptElem->parentNode->removeChild($scriptElem);
-        }
-
-        // Remove clickable links to JavaScript URI
-        $badLinks = $xPath->query('//*[contains(@href, \'javascript:\')]');
-        foreach ($badLinks as $badLink) {
-            $badLink->parentNode->removeChild($badLink);
-        }
-
-        // Remove forms with calls to JavaScript URI
-        $badForms = $xPath->query('//*[contains(@action, \'javascript:\')] | //*[contains(@formaction, \'javascript:\')]');
-        foreach ($badForms as $badForm) {
-            $badForm->parentNode->removeChild($badForm);
-        }
-
-        // Remove meta tag to prevent external redirects
-        $metaTags = $xPath->query('//meta[contains(@content, \'url\')]');
-        foreach ($metaTags as $metaTag) {
-            $metaTag->parentNode->removeChild($metaTag);
-        }
-
-        // Remove data or JavaScript iFrames
-        $badIframes = $xPath->query('//*[contains(@src, \'data:\')] | //*[contains(@src, \'javascript:\')] | //*[@srcdoc]');
-        foreach ($badIframes as $badIframe) {
-            $badIframe->parentNode->removeChild($badIframe);
-        }
-
-        // Remove 'on*' attributes
-        $onAttributes = $xPath->query('//@*[starts-with(name(), \'on\')]');
-        foreach ($onAttributes as $attr) {
-            /** @var \DOMAttr $attr*/
-            $attrName = $attr->nodeName;
-            $attr->parentNode->removeAttribute($attrName);
-        }
-
-        $html = '';
-        $topElems = $doc->documentElement->childNodes->item(0)->childNodes;
-        foreach ($topElems as $child) {
-            $html .= $doc->saveHTML($child);
-        }
-
-        return $html;
+        return $doc;
     }
 }

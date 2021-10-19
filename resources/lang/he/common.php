@@ -39,7 +39,12 @@ return [
     'reset' => 'איפוס',
     'remove' => 'הסר',
     'add' => 'הוסף',
+    'configure' => 'Configure',
     'fullscreen' => 'Fullscreen',
+    'favourite' => 'Favourite',
+    'unfavourite' => 'Unfavourite',
+    'next' => 'Next',
+    'previous' => 'Previous',
 
     // Sort Options
     'sort_options' => 'Sort Options',
@@ -56,6 +61,7 @@ return [
     'no_activity' => 'אין פעילות להציג',
     'no_items' => 'אין פריטים זמינים',
     'back_to_top' => 'בחזרה ללמעלה',
+    'skip_to_main_content' => 'Skip to main content',
     'toggle_details' => 'הצג/הסתר פרטים',
     'toggle_thumbnails' => 'הצג/הסתר תמונות',
     'details' => 'פרטים',
